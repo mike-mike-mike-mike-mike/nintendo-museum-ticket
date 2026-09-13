@@ -46,6 +46,7 @@ logs/
 # Project specific
 data/
 *.json
+!state.json
 
 # Testing
 .pytest_cache/
