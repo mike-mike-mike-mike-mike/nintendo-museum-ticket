@@ -25,7 +25,10 @@ classifiers = [
 run-monitor = "main:main"
 
 [dependency-groups]
-dev = ["pyinstaller>=6.12.0,<7"]
+dev = ["pyinstaller>=6.12.0,<7", "pytest>=8.0.0"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
 
 [tool.hatch.build.targets.sdist]
 include = [
