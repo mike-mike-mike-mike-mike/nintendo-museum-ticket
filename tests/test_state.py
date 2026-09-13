@@ -78,3 +78,16 @@ def test_missing_target_months_raises(tmp_path):
     path = write(tmp_path, {"config": {}, "state": {"available": []}})
     with pytest.raises(MalformedStateError):
         target_months(load(path))
+
+
+def test_missing_file_raises(tmp_path):
+    path = tmp_path / "state.json"
+    with pytest.raises(MalformedStateError):
+        load(path)
+
+
+def test_non_object_top_level_raises(tmp_path):
+    path = tmp_path / "state.json"
+    path.write_text(json.dumps(["2026-12"]))
+    with pytest.raises(MalformedStateError):
+        load(path)
