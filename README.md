@@ -27,11 +27,13 @@ Before you start, you'll need:
 ### Installing uv (Easy!)
 
 **macOS/Linux:**
+
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 **Windows:**
+
 ```powershell
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
@@ -54,6 +56,7 @@ uv sync
 ```
 
 That's it! `uv` will automatically:
+
 - Create a virtual environment
 - Install all required packages
 - Set everything up for you
@@ -74,7 +77,7 @@ GMAIL_USER=you@gmail.com
 GMAIL_APP_PASSWORD=your_16_char_app_password
 
 # Where to send availability notifications
-NOTIFY_EMAIL_TO=you@example.com
+NOTIFY_EMAIL_TO=you@example.com someone.else@example.com
 ```
 
 `GMAIL_APP_PASSWORD` must be a Gmail **App Password**, not your regular account
@@ -88,7 +91,9 @@ want checked (each as a `"YYYY-MM"` string):
 ```json
 {
   "config": {
-    "target_months": ["2026-12"]
+    "target_months": [
+      "2026-12"
+    ]
   },
   "state": {
     "available": []
@@ -113,10 +118,13 @@ newly-available dates, and updates `state.json`.
 ### Environment Variables
 
 | Variable | Description | Required |
-|----------|-------------|----------|
+| ---------- | ------------- | ---------- |
 | `GMAIL_USER` | Gmail address to send notifications from | Yes |
 | `GMAIL_APP_PASSWORD` | Gmail App Password for that account | Yes |
-| `NOTIFY_EMAIL_TO` | Address to send availability notifications to | Yes |
+| `NOTIFY_EMAIL_TO` | Addresses to send availability notifications to | Yes |
+
+Multiple recipients can be separated by commas, semicolons, or whitespace (spaces
+or tabs) — any mix of these works.
 
 ### `state.json`
 
@@ -187,6 +195,7 @@ Parameters:
 ```
 
 **Status Codes:**
+
 - `sale_status = 1` → Tickets available ✅
 - `sale_status = 2` → Tickets sold out ❌
 - `open_status = 1` → Museum open ✅
@@ -201,6 +210,7 @@ Parameters:
 ## 📝 Logs
 
 Logs are automatically saved in the `logs/` directory:
+
 - `nintendo_main.log` - Orchestration logs (`main.py`)
 - `nintendo_monitor.log` - Fetch/classification logs (`src/monitor.py`)
 - `nintendo_notifier.log` - Email send logs (`src/notifier.py`)
@@ -211,6 +221,7 @@ Logs are automatically saved in the `logs/` directory:
 
 One of `GMAIL_USER`, `GMAIL_APP_PASSWORD`, or `NOTIFY_EMAIL_TO` is missing.
 Check your `.env` file:
+
 ```bash
 cat .env
 ```
@@ -228,6 +239,7 @@ Every month in `config.target_months` is entirely in the past. Update
 ### "Module not found" errors
 
 Reinstall dependencies:
+
 ```bash
 uv sync
 ```
