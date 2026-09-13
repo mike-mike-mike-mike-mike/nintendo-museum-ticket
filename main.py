@@ -35,11 +35,14 @@ def run(path=None, today: date_type | None = None, monitor=None, sender=None) ->
     try:
         document = state_module.load(path)
         months = state_module.target_months(document)
+        live_months = [m for m in months if not is_fully_elapsed(m, today)]
     except MalformedStateError as exc:
         logger.error("Cannot read %s: %s", path, exc)
         return EXIT_FAILURE
+    except (ValueError, TypeError) as exc:
+        logger.error("Invalid entry in config.target_months (%s): %s", path, exc)
+        return EXIT_FAILURE
 
-    live_months = [m for m in months if not is_fully_elapsed(m, today)]
     if not live_months:
         logger.warning(
             "Every configured target month has fully elapsed (%s). Nothing to check — "
@@ -49,7 +52,11 @@ def run(path=None, today: date_type | None = None, monitor=None, sender=None) ->
 
     current: set[str] = set()
     for month in live_months:
-        year, month_number = parse_month(month)
+        try:
+            year, month_number = parse_month(month)
+        except (ValueError, TypeError) as exc:
+            logger.error("Invalid entry in config.target_months (%s): %s", path, exc)
+            return EXIT_FAILURE
         try:
             payload = monitor.fetch_calendar(year, month_number)
         except TransientFetchError as exc:

@@ -144,6 +144,17 @@ def test_malformed_state_exits_nonzero(tmp_path, calendar_payload):
     assert code == 1
 
 
+def test_malformed_target_month_exits_nonzero_without_raising(tmp_path, calendar_payload):
+    path = tmp_path / "state.json"
+    path.write_text(json.dumps({
+        "config": {"target_months": ["2026-1"]},
+        "state": {"available": []},
+    }))
+    code = run(path=path, today=TODAY, monitor=FakeMonitor(calendar_payload),
+               sender=RecordingSender())
+    assert code == 1
+
+
 def test_fetches_every_configured_month(tmp_path, calendar_payload):
     path = tmp_path / "state.json"
     path.write_text(json.dumps({
