@@ -6,7 +6,7 @@ from utils.logging_setter import setup_logger
 
 logger = setup_logger("nintendo_monitor", "nintendo_monitor.log")
 
-TRANSIENT_STATUSES = {429, 500, 502, 503, 504}
+TRANSIENT_STATUSES = {429}
 BLOCKED_STATUSES = {401, 403}
 
 
@@ -80,7 +80,7 @@ class NintendoMuseumMonitor:
                 f"HTTP {status} fetching {year}-{month:02d}. This most likely means the "
                 f"request was blocked (datacenter IP). Body head: {response.text[:200]!r}"
             )
-        if status in TRANSIENT_STATUSES:
+        if status in TRANSIENT_STATUSES or 500 <= status < 600:
             raise TransientFetchError(f"HTTP {status} fetching {year}-{month:02d}")
         if status != 200:
             raise FatalFetchError(f"unexpected HTTP {status} fetching {year}-{month:02d}")

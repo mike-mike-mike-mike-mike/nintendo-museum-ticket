@@ -37,9 +37,27 @@ def test_transient_statuses_raise_transient(monkeypatch, status):
         NintendoMuseumMonitor().fetch_calendar(2026, 12)
 
 
+@pytest.mark.parametrize("status", [501, 505, 520, 522, 524])
+def test_any_5xx_status_raises_transient(monkeypatch, status):
+    """5xx is transient even for codes outside the small enumerated set
+    (e.g. 501/505, or Cloudflare edge codes like 520/522/524)."""
+    _patch_get(monkeypatch, FakeResponse(status, text="busy"))
+    with pytest.raises(TransientFetchError):
+        NintendoMuseumMonitor().fetch_calendar(2026, 12)
+
+
 @pytest.mark.parametrize("status", [401, 403])
 def test_blocked_statuses_raise_fatal(monkeypatch, status):
     _patch_get(monkeypatch, FakeResponse(status, text="denied"))
+    with pytest.raises(FatalFetchError):
+        NintendoMuseumMonitor().fetch_calendar(2026, 12)
+
+
+def test_403_still_raises_fatal_not_swallowed_by_5xx_range(monkeypatch):
+    """Locks down check ordering: BLOCKED_STATUSES must be evaluated before
+    the 5xx transient range, so a 403 (likely runner IP block) is never
+    misclassified as transient."""
+    _patch_get(monkeypatch, FakeResponse(403, text="denied"))
     with pytest.raises(FatalFetchError):
         NintendoMuseumMonitor().fetch_calendar(2026, 12)
 
