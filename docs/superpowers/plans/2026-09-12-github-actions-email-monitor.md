@@ -29,7 +29,7 @@
 ## File Structure
 
 | File | Responsibility |
-|---|---|
+| --- | --- |
 | `.github/workflows/probe.yml` | **Throwaway.** Step-0 datacenter-IP check. Deleted in Task 10. |
 | `.github/workflows/monitor.yml` | Schedule, run, commit state |
 | `main.py` | Single-shot orchestration, exit codes |
@@ -51,6 +51,7 @@
 **This task gates every other task.** `src/monitor.py` uses `curl_cffi` with `impersonate="chrome110"` and supported residential proxies, which strongly suggests Nintendo blocks datacenter traffic. GitHub runners are datacenter IPs. Do not start Task 2 until this returns 200.
 
 **Files:**
+
 - Create: `.github/workflows/probe.yml`
 
 - [ ] **Step 1: Create the probe workflow**
@@ -117,10 +118,12 @@ Expected: `HTTP STATUS: 200` and `DAYS RETURNED: 31`.
 ### Task 2: Test scaffolding and the shared calendar fixture
 
 **Files:**
+
 - Modify: `pyproject.toml`
 - Create: `tests/conftest.py`
 
 **Interfaces:**
+
 - Produces: pytest fixture `calendar_payload` — a dict shaped exactly like the live API response, containing one available day, one closed day, one not-on-sale day, and one past day.
 
 - [ ] **Step 1: Add pytest as a dev dependency**
@@ -199,10 +202,12 @@ git commit -m "test: add pytest and shared calendar fixture"
 ### Task 3: `src/months.py` — month parsing and elapsed check
 
 **Files:**
+
 - Create: `src/months.py`
 - Test: `tests/test_months.py`
 
 **Interfaces:**
+
 - Produces:
   - `parse_month(value: str) -> tuple[int, int]` — `"2026-12"` → `(2026, 12)`; raises `ValueError` on anything else.
   - `is_fully_elapsed(value: str, today: datetime.date) -> bool` — True when the month's last day is strictly before `today`.
@@ -295,10 +300,12 @@ git commit -m "feat: add month parsing and elapsed-month helpers"
 Extract the availability decision out of the class as a pure function so it can be tested without network or state. The class's `check_availability` consulted `self.notified_dates`; that responsibility moves to the set difference in `main.py`.
 
 **Files:**
+
 - Modify: `src/monitor.py`
 - Test: `tests/test_availability.py`
 
 **Interfaces:**
+
 - Produces: `available_dates(calendar_data: dict, today: datetime.date) -> set[str]` — returns `YYYY-MM-DD` strings where `sale_status == 1` and `open_status == 1` and the date is strictly after `today`. Returns an empty set for `None` or a payload missing `data`/`calendar`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -379,10 +386,12 @@ git commit -m "feat: extract pure availability filter from monitor class"
 ### Task 5: `src/monitor.py` — fetch with transient/fatal error classification
 
 **Files:**
+
 - Modify: `src/monitor.py`
 - Test: `tests/test_fetch.py`
 
 **Interfaces:**
+
 - Produces:
   - `class TransientFetchError(Exception)` — caller should warn and exit 0.
   - `class FatalFetchError(Exception)` — caller should exit non-zero.
@@ -593,10 +602,12 @@ git commit -m "feat: classify fetch failures as transient or fatal"
 ### Task 6: `src/state.py` — config+state document
 
 **Files:**
+
 - Create: `src/state.py`
 - Test: `tests/test_state.py`
 
 **Interfaces:**
+
 - Produces:
   - `DEFAULT_PATH = pathlib.Path("state.json")`
   - `class MalformedStateError(Exception)`
@@ -762,10 +773,12 @@ git commit -m "feat: add config+state json document handling"
 ### Task 7: `src/notifier.py` — Gmail SMTP notification
 
 **Files:**
+
 - Create: `src/notifier.py`
 - Test: `tests/test_notifier.py`
 
 **Interfaces:**
+
 - Produces:
   - `class EmailConfigError(Exception)`
   - `send_availability_email(new_dates: set[str], smtp_factory=None) -> None` — sends exactly one message listing every date. `smtp_factory` is a no-argument callable returning an object supporting the `smtplib.SMTP` context-manager protocol (`__enter__`, `starttls`, `login`, `send_message`, `__exit__`); tests inject a fake. Reads `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `NOTIFY_EMAIL_TO` from the environment and raises `EmailConfigError` if any is missing.
@@ -777,7 +790,7 @@ Create `tests/test_notifier.py`:
 ```python
 import pytest
 
-from src.notifier import send_availability_email
+from src.notifier import EmailConfigError, send_availability_email
 
 
 class FakeSMTP:
@@ -937,16 +950,19 @@ git commit -m "feat: add gmail smtp availability notifier"
 ### Task 8: `main.py` — single-shot orchestration
 
 **Files:**
+
 - Modify: `main.py` (replace entirely)
 - Test: `tests/test_main.py`
 
 **Interfaces:**
+
 - Consumes: `src.monitor.NintendoMuseumMonitor`, `src.monitor.available_dates`, `src.monitor.TransientFetchError`, `src.monitor.FatalFetchError`, `src.months.parse_month`, `src.months.is_fully_elapsed`, `src.state.{load, target_months, available, save_available, MalformedStateError}`, `src.notifier.send_availability_email`
 - Produces: `run(path=None, today=None, monitor=None, sender=None) -> int` (each argument
   defaults to `None` and is resolved inside the function; `path` falls back to
   `src.state.DEFAULT_PATH`) — the exit code. Injectable arguments exist for tests; `main()` calls `run()` with none and passes the result to `sys.exit`.
 
 Exit-code contract from the spec:
+
 - `0` — success, or a transient fetch failure, or every configured month already elapsed
 - `1` — fatal fetch failure (401/403/bad body), malformed `state.json`, or email failure
 
@@ -1137,7 +1153,7 @@ from src.monitor import (
     available_dates,
 )
 from src.months import is_fully_elapsed, parse_month
-from src.notifier import send_availability_email
+from src.notifier import EmailConfigError, send_availability_email
 from src.state import MalformedStateError
 from utils.logging_setter import setup_logger
 
@@ -1232,6 +1248,7 @@ git commit -m "feat: single-shot orchestration with spec exit-code contract"
 `src/monitor.py` was already rewritten in Task 5 without them; this removes the now-unreferenced files, the dependency, and the stale configuration.
 
 **Files:**
+
 - Delete: `utils/discord_utils.py`, `utils/load_proxies.py`
 - Modify: `pyproject.toml`, `.env.example`
 
@@ -1296,6 +1313,7 @@ git commit -m "refactor: remove discord and proxy support"
 ### Task 10: `state.json`, the `.gitignore` fix, and the real workflow
 
 **Files:**
+
 - Create: `state.json`, `.github/workflows/monitor.yml`
 - Modify: `.gitignore`
 - Delete: `.github/workflows/probe.yml`
@@ -1314,8 +1332,21 @@ data/
 
 - [ ] **Step 2: Prove the fix works**
 
-Run: `git check-ignore -v state.json`
-Expected: **no output, exit status 1.** If it still prints a `.gitignore:49:*.json` line, the negation is in the wrong place.
+Run: `git check-ignore state.json; echo "exit=$?"` (note: **no** `-v`)
+Expected: **no output, exit status 1.**
+
+Do NOT use `-v` for this check. With `-v`, git reports the last matching pattern
+*including negations* and exits 0, so a correct fix prints
+`.gitignore:49:!state.json` and exits 0 — which reads like a failure but is
+success. The unambiguous checks are the plain form above plus:
+
+```bash
+git add --dry-run state.json   # expect: add 'state.json'
+git status --short state.json  # expect: ?? state.json
+```
+
+If the plain form prints a `.gitignore:49:*.json` line, the negation is in the
+wrong place — it must come *after* the `*.json` pattern.
 
 - [ ] **Step 3: Create `state.json`**
 

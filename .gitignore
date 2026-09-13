@@ -44,9 +44,9 @@ logs/
 .DS_Store
 
 # Project specific
-utils/proxies.txt
 data/
 *.json
+!state.json
 
 # Testing
 .pytest_cache/
