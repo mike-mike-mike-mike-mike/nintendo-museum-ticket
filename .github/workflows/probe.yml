@@ -1,0 +1,34 @@
+name: Step 0 Probe
+on: workflow_dispatch
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - name: Fetch calendar and report status
+        run: |
+          uv run python - <<'PY'
+          from curl_cffi import requests
+          H = {
+              "X-Requested-With": "XMLHttpRequest",
+              "Accept": "application/json, text/plain, */*",
+              "Referer": "https://museum-tickets.nintendo.com/en/calendar",
+              "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
+          }
+          r = requests.get(
+              "https://museum-tickets.nintendo.com/en/api/calendar",
+              params={"target_year": 2026, "target_month": 12},
+              headers=H, impersonate="chrome110", timeout=30,
+          )
+          print("HTTP STATUS:", r.status_code)
+          print("BODY HEAD:", r.text[:400])
+          r.raise_for_status()
+          days = r.json()["data"]["calendar"]
+          print("DAYS RETURNED:", len(days))
+          PY
