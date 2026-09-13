@@ -132,6 +132,14 @@ In `pyproject.toml`, change the `[dependency-groups]` block to:
 dev = ["pyinstaller>=6.12.0,<7", "pytest>=8.0.0"]
 ```
 
+Also add this block, so `from src.months import ...` resolves from the repo root
+deterministically rather than as a side effect of the project being installed:
+
+```toml
+[tool.pytest.ini_options]
+pythonpath = ["."]
+```
+
 - [ ] **Step 2: Sync and confirm pytest is available**
 
 Run: `uv sync && uv run pytest --version`
@@ -1382,11 +1390,37 @@ jobs:
 git rm .github/workflows/probe.yml
 ```
 
-- [ ] **Step 6: Verify locally before pushing**
+- [ ] **Step 6: Verify locally against a scratch state file**
 
-Run: `uv run pytest -v && uv run python -c "import main; print(main.run())"`
+**Do not run `main.run()` with no arguments here.** It defaults to the real
+`state.json` you just created, which would send the first-run email now and write
+~24 dates to disk — leaving nothing for Task 11 Step 3 to verify. Task 11 would
+then show a green job, no email, and no commit, which looks identical to a broken
+monitor.
 
-Expected: tests pass. `run()` needs the three Gmail variables in a local `.env`; with December configured it will really send one email listing the currently-available dates. If you would rather not send a real email yet, set `config.target_months` to an elapsed month first and confirm it returns `0` with the "fully elapsed" warning.
+Use a scratch copy instead:
+
+```bash
+uv run pytest -v
+cp state.json /tmp/probe-state.json
+uv run python -c "
+import main, pathlib
+print('exit code:', main.run(path=pathlib.Path('/tmp/probe-state.json')))
+"
+```
+
+Expected: tests pass; the run prints `exit code: 0`; one real email arrives
+listing the available December dates (this needs the three Gmail variables in a
+local `.env`); and `/tmp/probe-state.json` — **not** the repo's `state.json` —
+now lists those dates.
+
+- [ ] **Step 6b: Confirm the repo's state file is still pristine**
+
+Run: `git diff --stat state.json && cat state.json`
+
+Expected: no diff, and `state.available` is still `[]`. If it is populated, the
+local run wrote to the wrong file — reset it to `[]` before committing, or
+Task 11's first-run verification cannot work.
 
 - [ ] **Step 7: Commit**
 
@@ -1395,11 +1429,22 @@ git add -A .gitignore state.json .github/
 git commit -m "feat: add scheduled monitor workflow and initial state"
 ```
 
+The committed `state.available` must be `[]` so that the first scheduled or
+manual run is a genuine first run.
+
 ---
 
 ### Task 11: End-to-end validation on GitHub
 
 No code changes. This is the spec's manual validation sequence.
+
+- [ ] **Step 0: Note the repository is PUBLIC**
+
+`mike-mike-mike-mike-mike/nintendo-museum-ticket` is public, so `state.json` and
+its commit history are world-readable. That is fine for ticket dates, which carry
+nothing sensitive, but confirm no personal data is ever added to the `config`
+section — the recipient address stays in the `NOTIFY_EMAIL_TO` secret and must
+not be moved into `state.json` for convenience.
 
 - [ ] **Step 1: Add the repository secrets**
 
