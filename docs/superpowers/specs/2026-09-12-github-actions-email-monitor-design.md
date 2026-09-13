@@ -117,9 +117,18 @@ Without it the workflow's `git add` is a permanent no-op.
 
 State advances only on full success, so a failed run is always safe to retry.
 
-- **Any month's fetch fails** → log, exit non-zero, write nothing. Writing a
-  partial `current` set would drop dates that were merely unfetched, and then
-  spuriously re-notify them on the next run.
+- **A fetch fails transiently** — timeout, connection error, HTTP 5xx, or 429 →
+  log a warning, write nothing, **exit 0**. On a 5-minute schedule a loud failure
+  would mean a red X and a GitHub failure email every 5 minutes until Nintendo
+  recovered. Retry logic is a deliberate follow-up, not part of this change.
+- **A fetch fails in a way that is not transient** — HTTP 401/403, or a 200 whose
+  body is not the expected JSON shape → log, **exit non-zero**. A 403 is the
+  single most important signal this design can receive: it most likely means the
+  runner's datacenter IP is blocked, which invalidates the architecture. It must
+  never be swallowed as noise.
+- **Any fetch failure, transient or not** → write nothing. Writing a partial
+  `current` set would drop dates that were merely unfetched, then spuriously
+  re-notify them on the next run.
 - **Email fails** → log, exit non-zero, write nothing, so the next run retries
   the same notification.
 - **Email succeeds** → write state, then let the workflow commit.
@@ -129,8 +138,17 @@ State advances only on full success, so a failed run is always safe to retry.
   reopen. The rule is: a full successful fetch always writes state; an email, if
   one is required, must succeed first.
 
-Exceptions propagate and fail the job rather than being swallowed; Actions
-surfaces them in the run log and its own failure history.
+Unexpected exceptions propagate and fail the job rather than being swallowed;
+Actions surfaces them in the run log and its own failure history. Malformed
+`state.json` and a failed email send are hard failures, never transient.
+
+### Configured month entirely in the past
+
+If every entry in `config.target_months` has fully elapsed, the job logs a
+warning and exits 0. It is not a hard failure: this monitor is intended for one
+specific month, and a hard failure after that month passes would just be noise.
+The warning exists so that a permanently quiet monitor can be told apart from
+one that simply has no tickets to report.
 
 ### First run
 
