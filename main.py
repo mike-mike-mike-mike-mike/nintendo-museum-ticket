@@ -15,6 +15,7 @@ from src.monitor import (
 from src.months import is_fully_elapsed, parse_month
 from src.notifier import send_availability_email
 from src.state import MalformedStateError
+from src.retry import with_retry
 from utils.logging_setter import setup_logger
 
 load_dotenv()
@@ -58,7 +59,7 @@ def run(path=None, today: date_type | None = None, monitor=None, sender=None) ->
             logger.error("Invalid entry in config.target_months (%s): %s", path, exc)
             return EXIT_FAILURE
         try:
-            payload = monitor.fetch_calendar(year, month_number)
+            payload = with_retry(lambda: monitor.fetch_calendar(year, month_number))
         except TransientFetchError as exc:
             logger.warning("Transient fetch failure, leaving state untouched: %s", exc)
             return EXIT_OK
@@ -76,7 +77,7 @@ def run(path=None, today: date_type | None = None, monitor=None, sender=None) ->
 
     if newly_available:
         try:
-            sender(newly_available)
+            with_retry(lambda: sender(newly_available), retryable_errors=(Exception,))
         except Exception as exc:
             logger.error("Failed to send notification, leaving state untouched: %s", exc)
             return EXIT_FAILURE

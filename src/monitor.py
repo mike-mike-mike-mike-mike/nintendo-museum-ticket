@@ -2,6 +2,7 @@ from datetime import date, datetime
 
 from curl_cffi import requests
 
+from src.retry import RetryableError
 from utils.logging_setter import setup_logger
 
 logger = setup_logger("nintendo_monitor", "nintendo_monitor.log")
@@ -10,7 +11,7 @@ TRANSIENT_STATUSES = {429}
 BLOCKED_STATUSES = {401, 403}
 
 
-class TransientFetchError(Exception):
+class TransientFetchError(RetryableError):
     """A retryable upstream problem. The caller should warn and exit 0."""
 
 
