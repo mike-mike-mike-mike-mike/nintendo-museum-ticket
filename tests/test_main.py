@@ -20,25 +20,35 @@ def state_file(tmp_path):
 
 
 class FakeMonitor:
-    def __init__(self, payload=None, error=None):
+    """fail_times=None means `error` is raised on every call; an int caps
+    how many leading calls fail before it starts succeeding."""
+
+    def __init__(self, payload=None, error=None, fail_times=None):
         self.payload = payload
         self.error = error
+        self.fail_times = fail_times
         self.calls = []
 
     def fetch_calendar(self, year, month):
         self.calls.append((year, month))
-        if self.error:
+        if self.error and (self.fail_times is None or len(self.calls) <= self.fail_times):
             raise self.error
         return self.payload
 
 
 class RecordingSender:
-    def __init__(self, error=None):
+    """fail_times=None means `error` is raised on every call; an int caps
+    how many leading calls fail before it starts succeeding."""
+
+    def __init__(self, error=None, fail_times=None):
         self.error = error
+        self.fail_times = fail_times
         self.sent = []
+        self.attempts = 0
 
     def __call__(self, dates):
-        if self.error:
+        self.attempts += 1
+        if self.error and (self.fail_times is None or self.attempts <= self.fail_times):
             raise self.error
         self.sent.append(set(dates))
 
@@ -98,29 +108,54 @@ def test_reopened_date_notifies_again(state_file, calendar_payload):
 
 def test_transient_fetch_failure_exits_zero_without_writing(state_file):
     sender = RecordingSender()
-    code = run(path=state_file, today=TODAY,
-               monitor=FakeMonitor(error=TransientFetchError("503")), sender=sender)
+    monitor = FakeMonitor(error=TransientFetchError("503"))
+    code = run(path=state_file, today=TODAY, monitor=monitor, sender=sender)
 
     assert code == 0
     assert sender.sent == []
     assert read_available(state_file) == []
+    assert len(monitor.calls) == 3, "should retry the fetch before giving up"
+
+
+def test_transient_fetch_recovers_after_retry(state_file, calendar_payload):
+    """A fetch that fails once or twice with a transient error and then
+    succeeds must behave exactly like a clean first try."""
+    sender = RecordingSender()
+    monitor = FakeMonitor(calendar_payload, error=TransientFetchError("503"), fail_times=2)
+    code = run(path=state_file, today=TODAY, monitor=monitor, sender=sender)
+
+    assert code == 0
+    assert len(monitor.calls) == 3
+    assert sender.sent == [{"2026-12-15", "2026-12-16"}]
+    assert read_available(state_file) == ["2026-12-15", "2026-12-16"]
 
 
 def test_fatal_fetch_failure_exits_nonzero_without_writing(state_file):
-    code = run(path=state_file, today=TODAY,
-               monitor=FakeMonitor(error=FatalFetchError("403 blocked")),
-               sender=RecordingSender())
+    monitor = FakeMonitor(error=FatalFetchError("403 blocked"))
+    code = run(path=state_file, today=TODAY, monitor=monitor, sender=RecordingSender())
 
     assert code == 1
     assert read_available(state_file) == []
+    assert len(monitor.calls) == 1, "a fatal error is not retryable"
 
 
 def test_email_failure_exits_nonzero_and_does_not_advance_state(state_file, calendar_payload):
-    code = run(path=state_file, today=TODAY, monitor=FakeMonitor(calendar_payload),
-               sender=RecordingSender(error=RuntimeError("smtp down")))
+    sender = RecordingSender(error=RuntimeError("smtp down"))
+    code = run(path=state_file, today=TODAY, monitor=FakeMonitor(calendar_payload), sender=sender)
 
     assert code == 1
     assert read_available(state_file) == [], "state must not advance if the email failed"
+    assert sender.attempts == 3, "should retry sending before giving up"
+
+
+def test_email_recovers_after_retry(state_file, calendar_payload):
+    sender = RecordingSender(error=RuntimeError("smtp down"), fail_times=2)
+    code = run(path=state_file, today=TODAY, monitor=FakeMonitor(calendar_payload), sender=sender)
+
+    assert code == 0
+    assert sender.attempts == 3
+    assert sender.sent == [{"2026-12-15", "2026-12-16"}]
+    assert read_available(state_file) == ["2026-12-15", "2026-12-16"]
 
 
 def test_elapsed_month_exits_zero(tmp_path, calendar_payload):
