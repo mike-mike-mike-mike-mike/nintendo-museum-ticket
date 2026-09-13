@@ -35,5 +35,7 @@ def save_available(document: dict, new_available: set[str], path: Path = DEFAULT
     """Replace only state.available, leaving config untouched."""
     document.setdefault("state", {})["available"] = sorted(new_available)
     Path(path).write_text(
-        json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        json.dumps(document, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+        newline="\n",
     )
