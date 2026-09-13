@@ -44,7 +44,6 @@ logs/
 .DS_Store
 
 # Project specific
-utils/proxies.txt
 data/
 *.json
 

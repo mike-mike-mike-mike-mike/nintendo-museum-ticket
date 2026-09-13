@@ -4,20 +4,18 @@ Automated monitor for available tickets at the Nintendo Museum in Kyoto, Japan.
 
 ## 🎮 What is This?
 
-This tool automatically checks for available tickets at the [Nintendo Museum in Kyoto](https://museum.nintendo.com/) and sends you a Discord notification when tickets become available. Perfect for anyone trying to visit the museum!
+This tool checks for available tickets at the [Nintendo Museum in Kyoto](https://museum.nintendo.com/) and emails you when new dates become available. It runs as a single check per invocation — GitHub Actions triggers it on a schedule — rather than as a long-running loop.
 
 ## ✨ Features
 
 - 🔍 Monitors Nintendo Museum ticket availability
-- 🔄 Automatic proxy rotation on every request (optional)
 - 🌐 Browser impersonation using `curl_cffi` (Chrome 110)
-- 💬 Discord webhook notifications
-- ⏱️ Configurable check interval
+- 📧 Email notifications via Gmail SMTP
 - 🎯 Smart filters:
   - Only open days (excludes Tuesdays when museum is closed)
   - Only available tickets (`sale_status == 1`)
   - Only future dates
-  - No duplicate notifications
+  - No duplicate notifications — only newly-available dates trigger an email
 
 ## 📋 Prerequisites
 
@@ -60,7 +58,7 @@ That's it! `uv` will automatically:
 - Install all required packages
 - Set everything up for you
 
-### 3. Configure Your Settings
+### 3. Configure Gmail Credentials
 
 Create a `.env` file from the example:
 
@@ -71,106 +69,81 @@ cp .env.example .env
 Then edit `.env` with your settings:
 
 ```env
-# Discord Webhook URL (required)
-DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/YOUR_WEBHOOK_URL
+# Gmail credentials for notifications (app password, NOT your account password)
+GMAIL_USER=you@gmail.com
+GMAIL_APP_PASSWORD=your_16_char_app_password
 
-# Check interval in seconds (optional, default: 20)
-MONITOR_INTERVAL=20
-
-# Webshare Proxy API (optional)
-API_KEY_WEBSHARE=your_api_key
-USE_WEBSHARE=True
+# Where to send availability notifications
+NOTIFY_EMAIL_TO=you@example.com
 ```
 
-### 4. Set Up Discord Notifications
+`GMAIL_APP_PASSWORD` must be a Gmail **App Password**, not your regular account
+password — generate one from your Google Account's security settings.
 
-Don't worry, it's easy! Follow these steps:
+### 4. Configure the Months to Watch
 
-1. Open Discord and go to your server
-2. Click on **Server Settings** → **Integrations** → **Webhooks**
-3. Click **New Webhook**
-4. Give it a name (e.g., "Nintendo Museum Bot")
-5. Choose a channel where you want notifications
-6. Click **Copy Webhook URL**
-7. Paste the URL in your `.env` file
+Create (or edit) `state.json` and set `config.target_months` to the months you
+want checked (each as a `"YYYY-MM"` string):
 
-**Example:**
-```env
-DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/123456789/abcdefghijklmnop
+```json
+{
+  "config": {
+    "target_months": ["2026-12"]
+  },
+  "state": {
+    "available": []
+  }
+}
 ```
 
-### 5. Run the Monitor
+Leave `state.available` as `[]` — the monitor manages that list itself and uses
+it to detect newly-available dates between runs.
+
+### 5. Run a Check
 
 ```bash
-uv run python main.py
+uv run main.py
 ```
 
-The monitor will start checking for tickets automatically! 🎉
+This performs one check against every configured month, emails you about any
+newly-available dates, and updates `state.json`.
 
-## ⚙️ Configuration Options
+## ⚙️ Configuration
 
-### Basic Settings
+### Environment Variables
 
-| Setting | Description | Default |
-|---------|-------------|---------|
-| `DISCORD_WEBHOOK_URL` | Your Discord webhook URL (required) | None |
-| `MONITOR_INTERVAL` | How often to check for tickets (seconds) | 20 |
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `GMAIL_USER` | Gmail address to send notifications from | Yes |
+| `GMAIL_APP_PASSWORD` | Gmail App Password for that account | Yes |
+| `NOTIFY_EMAIL_TO` | Address to send availability notifications to | Yes |
 
-### Proxy Settings (Optional)
+### `state.json`
 
-Proxies help avoid rate limiting and IP blocks.
+| Field | Description |
+|-------|-------------|
+| `config.target_months` | List of `"YYYY-MM"` strings to check. A month that has fully elapsed is skipped. |
+| `state.available` | Dates currently known to be available. Written by the monitor after each run — don't hand-edit it. |
 
-**Option 1: Webshare API (Recommended)**
-```env
-API_KEY_WEBSHARE=your_api_key_here
-USE_WEBSHARE=True
-```
+### Scheduling
 
-**Option 2: Custom Proxy File**
-```env
-USE_WEBSHARE=False
-```
-
-Create `utils/proxies.txt`:
-```
-ip:port:username:password
-ip:port:username:password
-```
-
-**Option 3: No Proxies**
-```env
-USE_WEBSHARE=False
-```
-Leave out the `proxies.txt` file to use direct connections.
-
-## 📊 Example Output
-
-When running, you'll see output like this:
-
-```
-2025-10-25 09:52:00 - nintendo_main - INFO - ==================================================
-2025-10-25 09:52:00 - nintendo_main - INFO - Nintendo Museum Ticket Monitor
-2025-10-25 09:52:00 - nintendo_main - INFO - ==================================================
-2025-10-25 09:52:00 - nintendo_main - INFO - Monitoring: 2025-10
-2025-10-25 09:52:00 - nintendo_main - INFO - Interval: 20 seconds
-2025-10-25 09:52:00 - nintendo_main - INFO - ==================================================
-2025-10-25 09:52:00 - nintendo_monitor - INFO - Starting Nintendo Museum Monitor for 2025-10
-2025-10-25 09:52:02 - nintendo_monitor - INFO - Successfully fetched calendar for 2025-10
-2025-10-25 09:52:02 - nintendo_monitor - INFO - Found available date: 2025-10-26 (sale_status=1, open_status=1)
-2025-10-25 09:52:02 - nintendo_monitor - INFO - Found 1 available dates
-2025-10-25 09:52:03 - nintendo_monitor - INFO - Notification sent for 2025-10-26
-```
+There is no interval setting to configure. In production this runs as a
+GitHub Actions workflow on a `*/5 * * * *` cron schedule, checking every 5
+minutes. GitHub's cron schedules are best-effort, not exact — during periods
+of high load, scheduled runs routinely fire 10–30 minutes late.
 
 ## 📁 Project Structure
 
 ```
 nintendo-museum/
-├── main.py                 # Main entry point - start here!
+├── main.py                # Single-shot entry point - start here!
+├── state.json             # Target months + last-known availability
 ├── src/
-│   └── monitor.py         # Core monitoring logic
+│   ├── monitor.py         # Fetches and classifies calendar availability
+│   ├── months.py          # "YYYY-MM" parsing helpers
+│   ├── state.py           # Reads/writes state.json
+│   └── notifier.py        # Gmail SMTP email notifications
 ├── utils/
-│   ├── discord_utils.py   # Discord webhook handler
-│   ├── load_proxies.py    # Proxy management
 │   └── logging_setter.py  # Logging configuration
 ├── logs/                  # Log files (auto-created)
 ├── .env                   # Your configuration (not in git)
@@ -223,36 +196,34 @@ Parameters:
 
 - `curl-cffi` - Browser impersonation for requests
 - `python-dotenv` - Environment variable management
-- `discord-webhook` - Discord notifications
-- `requests` - Proxy API calls
+- Email is sent using Python's standard library (`smtplib`, `email`) — no extra dependency
 
 ## 📝 Logs
 
 Logs are automatically saved in the `logs/` directory:
-- `nintendo_main_monitor.log` - Main process logs
-- `nintendo_monitor_monitor.log` - Monitor activity logs
+- `nintendo_main.log` - Orchestration logs (`main.py`)
+- `nintendo_monitor.log` - Fetch/classification logs (`src/monitor.py`)
+- `nintendo_notifier.log` - Email send logs (`src/notifier.py`)
 
 ## 🔥 Troubleshooting
 
-### "No proxies available"
+### "environment variable ... is not set"
 
-**Solution 1:** Use direct connection
-```env
-USE_WEBSHARE=False
-```
-Remove or don't create `utils/proxies.txt`
-
-**Solution 2:** Check your proxy configuration
+One of `GMAIL_USER`, `GMAIL_APP_PASSWORD`, or `NOTIFY_EMAIL_TO` is missing.
+Check your `.env` file:
 ```bash
 cat .env
 ```
 
-### "Discord webhook URL not configured"
+### "config.target_months must be a non-empty list"
 
-Make sure your `.env` file has the webhook URL:
-```bash
-cat .env | grep DISCORD_WEBHOOK_URL
-```
+`state.json` is missing `config.target_months`, or it isn't a non-empty list.
+Fix the file as shown in [Configure the Months to Watch](#4-configure-the-months-to-watch).
+
+### "Every configured target month has fully elapsed"
+
+Every month in `config.target_months` is entirely in the past. Update
+`state.json` with a current or future month.
 
 ### "Module not found" errors
 
@@ -261,17 +232,10 @@ Reinstall dependencies:
 uv sync
 ```
 
-### Monitor stops unexpectedly
-
-Check the log files in `logs/` for error messages.
-
 ## ℹ️ Important Notes
 
 **Museum Closure:**
 The Nintendo Museum is **closed on Tuesdays**. The monitor automatically skips these days.
-
-**Rate Limiting:**
-Use a reasonable check interval (recommended: 20-60 seconds) to avoid overwhelming the API.
 
 **Responsible Use:**
 This tool is for personal use only. Please respect Nintendo's terms of service and don't abuse the API.

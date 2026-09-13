@@ -1,18 +1,17 @@
 [project]
 name = "nintendo-museum"
 version = "1.0.0"
-description = "Automated monitor for Nintendo Museum ticket availability with Discord notifications"
+description = "Automated monitor for Nintendo Museum ticket availability with email notifications"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "curl-cffi>=0.13.0",
-    "discord-webhook>=1.4.1",
     "python-dotenv>=1.1.1",
 ]
 authors = [
     {name = "Your Name", email = "your.email@example.com"}
 ]
-keywords = ["nintendo", "museum", "ticket", "monitor", "discord", "automation"]
+keywords = ["nintendo", "museum", "ticket", "monitor", "email", "automation"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: End Users/Desktop",
