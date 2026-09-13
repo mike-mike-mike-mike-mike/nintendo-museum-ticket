@@ -2,7 +2,7 @@ import os
 import sys
 import time
 import random
-from datetime import datetime
+from datetime import date, datetime
 from typing import Dict, Any
 from curl_cffi import requests
 from dotenv import load_dotenv
@@ -16,6 +16,22 @@ from utils.logging_setter import setup_logger
 load_dotenv()
 
 logger = setup_logger('nintendo_monitor', 'nintendo_monitor.log')
+
+
+def available_dates(calendar_data: dict | None, today: date) -> set[str]:
+    """Dates that are on sale, open, and strictly in the future."""
+    if not calendar_data:
+        return set()
+    calendar = calendar_data.get("data", {}).get("calendar", {})
+    found = set()
+    for date_str, info in calendar.items():
+        if info.get("sale_status") != 1 or info.get("open_status") != 1:
+            continue
+        if datetime.strptime(date_str, "%Y-%m-%d").date() <= today:
+            continue
+        found.add(date_str)
+    return found
+
 
 class NintendoMuseumMonitor:
     """Monitor for Nintendo Museum ticket availability"""
