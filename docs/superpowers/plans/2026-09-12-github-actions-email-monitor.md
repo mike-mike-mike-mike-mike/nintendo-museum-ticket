@@ -777,7 +777,7 @@ Create `tests/test_notifier.py`:
 ```python
 import pytest
 
-from src.notifier import send_availability_email
+from src.notifier import EmailConfigError, send_availability_email
 
 
 class FakeSMTP:
@@ -1137,7 +1137,7 @@ from src.monitor import (
     available_dates,
 )
 from src.months import is_fully_elapsed, parse_month
-from src.notifier import send_availability_email
+from src.notifier import EmailConfigError, send_availability_email
 from src.state import MalformedStateError
 from utils.logging_setter import setup_logger
 
