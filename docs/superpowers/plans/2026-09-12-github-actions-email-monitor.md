@@ -578,7 +578,8 @@ Note: `except Exception` around the request is intentionally broad — `curl_cff
 - [ ] **Step 4: Run to verify pass**
 
 Run: `uv run pytest tests/test_fetch.py tests/test_availability.py -v`
-Expected: 15 passed.
+Expected: 16 passed (11 in `test_fetch.py` — the two parametrized cases expand to
+5 and 2 — plus the 5 from `test_availability.py`).
 
 - [ ] **Step 5: Commit**
 
@@ -922,7 +923,7 @@ def send_availability_email(new_dates: set[str], smtp_factory=None) -> None:
 - [ ] **Step 4: Run to verify pass**
 
 Run: `uv run pytest tests/test_notifier.py -v`
-Expected: 8 passed.
+Expected: 7 passed (the parametrized missing-secret case expands to 3).
 
 - [ ] **Step 5: Commit**
 
@@ -941,7 +942,9 @@ git commit -m "feat: add gmail smtp availability notifier"
 
 **Interfaces:**
 - Consumes: `src.monitor.NintendoMuseumMonitor`, `src.monitor.available_dates`, `src.monitor.TransientFetchError`, `src.monitor.FatalFetchError`, `src.months.parse_month`, `src.months.is_fully_elapsed`, `src.state.{load, target_months, available, save_available, MalformedStateError}`, `src.notifier.send_availability_email`
-- Produces: `run(path=state.DEFAULT_PATH, today=None, monitor=None, sender=None) -> int` — the exit code. Injectable arguments exist for tests; `main()` calls `run()` with none and passes the result to `sys.exit`.
+- Produces: `run(path=None, today=None, monitor=None, sender=None) -> int` (each argument
+  defaults to `None` and is resolved inside the function; `path` falls back to
+  `src.state.DEFAULT_PATH`) — the exit code. Injectable arguments exist for tests; `main()` calls `run()` with none and passes the result to `sys.exit`.
 
 Exit-code contract from the spec:
 - `0` — success, or a transient fetch failure, or every configured month already elapsed
