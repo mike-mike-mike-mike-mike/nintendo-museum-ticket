@@ -1,8 +1,15 @@
 name: Ticket Monitor
 
+# Triggered exclusively by an external scheduler (cron-job.org) posting to the
+# workflow_dispatch REST endpoint. GitHub's own `schedule` trigger is deliberately
+# absent for two reasons:
+#   1. It delivered ~2 of every 71 requested runs (observed gaps of 128/113/115
+#      minutes against a "*/5" cron), which is useless for catching cancellations.
+#   2. Any workflow carrying a `schedule` trigger is auto-disabled after 60 days
+#      without repository activity -- and that disables *every* trigger on the
+#      workflow, with no automatic re-enable. A monitor watching a sold-out month
+#      writes no state, so it makes no commits, so it would silently die on day 60.
 on:
-  schedule:
-    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 permissions:
