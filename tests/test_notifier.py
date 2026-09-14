@@ -111,3 +111,47 @@ def test_separators_only_value_raises_email_config_error(env, monkeypatch):
     monkeypatch.setenv("NOTIFY_EMAIL_TO", " , ; ")
     with pytest.raises(EmailConfigError):
         send_availability_email({"2026-12-15"}, smtp_factory=lambda: FakeSMTP())
+
+
+def test_mixed_recipients_get_two_differently_formatted_messages(env, monkeypatch):
+    monkeypatch.setenv("NOTIFY_EMAIL_TO", "me@example.com 5551234567@vtext.com")
+    fake = FakeSMTP()
+    send_availability_email({"2026-12-15"}, smtp_factory=lambda: fake)
+
+    assert len(fake.messages) == 2
+    by_recipient = {_delivered_recipients(m)[0]: m for m in fake.messages}
+
+    email_message = by_recipient["me@example.com"]
+    assert "2026-12-15" in email_message.get_content()
+    assert email_message["Subject"] is not None
+
+    sms_message = by_recipient["5551234567@vtext.com"]
+    assert "2026-12-15" not in sms_message.get_content(), "sms body lists a count, not each date"
+    assert sms_message["Subject"] is None, "subject would eat into the sms character budget"
+
+
+def test_sms_only_recipient_sends_no_email_variant(env, monkeypatch):
+    monkeypatch.setenv("NOTIFY_EMAIL_TO", "5551234567@vtext.com")
+    fake = FakeSMTP()
+    send_availability_email({"2026-12-15"}, smtp_factory=lambda: fake)
+
+    assert len(fake.messages) == 1
+    assert _delivered_recipients(fake.messages[0]) == ["5551234567@vtext.com"]
+
+
+def test_second_sms_gateway_domain_is_recognized(env, monkeypatch):
+    monkeypatch.setenv("NOTIFY_EMAIL_TO", "5551234567@txt.att.net")
+    fake = FakeSMTP()
+    send_availability_email({"2026-12-15"}, smtp_factory=lambda: fake)
+
+    assert len(fake.messages) == 1
+    assert fake.messages[0]["Subject"] is None
+
+
+def test_sms_gateway_domain_match_is_case_insensitive(env, monkeypatch):
+    monkeypatch.setenv("NOTIFY_EMAIL_TO", "5551234567@VTEXT.COM")
+    fake = FakeSMTP()
+    send_availability_email({"2026-12-15"}, smtp_factory=lambda: fake)
+
+    assert len(fake.messages) == 1
+    assert fake.messages[0]["Subject"] is None
