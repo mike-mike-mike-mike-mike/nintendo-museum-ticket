@@ -43,7 +43,7 @@ field's meaning, and any retry/backoff beyond what Actions' schedule provides.
 ## Architecture
 
 ```
-GitHub Actions (cron */5 + workflow_dispatch)
+cron-job.org --POST--> GitHub Actions (workflow_dispatch only)
         |
         v
    uv run main.py
@@ -161,7 +161,8 @@ date as the current Discord code does.
 
 `.github/workflows/monitor.yml`
 
-- `on: schedule: "*/5 * * * *"` plus `workflow_dispatch`
+- `on: workflow_dispatch` only — no `schedule` trigger; see "Known
+  limitation (RESOLVED)" below for why the cron was removed
 - `permissions: contents: write` — nothing broader
 - `concurrency: {group: ticket-monitor, cancel-in-progress: false}`
 - `timeout-minutes: 5` — a hang guard, so a stuck run cannot occupy the job
@@ -228,10 +229,36 @@ Manual validation, in order: run locally end-to-end; trigger via
 trigger again and confirm no duplicate email; force a failure and confirm state
 did not advance.
 
-## Known limitation
+## Known limitation (RESOLVED 2026-09-14 — superseded by external trigger)
 
-GitHub's `*/5` cron is best-effort. Scheduled workflows are routinely delayed
-10–30 minutes under platform load, and may be skipped entirely during incidents.
-This is adequate for "probably notice within the hour" but is **not** reliable
-5-minute polling. If catching a ticket drop within minutes is a hard
-requirement, Actions is the wrong scheduler and this design does not meet it.
+The original design accepted GitHub's best-effort `*/5` cron, noting it was
+adequate for "probably notice within the hour" but not reliable 5-minute
+polling, and that Actions would be the wrong scheduler if catching a drop
+within minutes were a hard requirement.
+
+**That limitation was measured and proved disqualifying.** Cron went live at
+`2026-09-13T20:58:08Z`; over the following ~6 hours the observed gaps between
+scheduled runs were **128, 113, and 115 minutes** — roughly 2 of every 71
+requested runs. The target month is `2026-11`, which is sold out, so the
+monitor's purpose is catching a *cancellation*. Returned tickets are claimed
+quickly, making a ~2-hour poll interval effectively useless.
+
+A second, worse defect surfaced while fixing the first: any workflow carrying a
+`schedule` trigger is **auto-disabled after 60 days without repository
+activity**, that disable applies to *every* trigger on the workflow (users
+report `pull_request` triggers dying too), and it does **not** re-enable on new
+activity. A monitor watching a sold-out month finds no new dates, so it writes
+no state, so it makes no commits — meaning zero repository activity and a
+silent death on day 60, precisely when it is being relied upon.
+
+**Resolution:** the `schedule` trigger is removed entirely and the workflow is
+driven only by `workflow_dispatch`, posted by an external scheduler
+(cron-job.org) against the REST dispatch endpoint. Removing `schedule` is what
+takes the 60-day auto-disable rule out of scope — it has no scheduled workflow
+to act on. Per-run design, state model, and failure semantics are unchanged.
+
+This moves the reliability dependency from GitHub's scheduler onto the external
+service, which is the intended trade. The residual risk is that the external
+job is deleted or silently stops; `workflow_dispatch` returns `204 No Content`
+on success, so the external service can detect and alert on a non-2xx dispatch,
+but it cannot detect its own absence.
