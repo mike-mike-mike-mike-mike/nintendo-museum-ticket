@@ -25,3 +25,13 @@ def test_empty_for_missing_or_malformed_payloads():
     assert available_dates(None, TODAY) == set()
     assert available_dates({}, TODAY) == set()
     assert available_dates({"data": {}}, TODAY) == set()
+
+
+def test_excludes_dates_after_the_configured_range_end(calendar_payload):
+    result = available_dates(calendar_payload, TODAY, end=date(2026, 12, 15))
+    assert result == {"2026-12-15"}
+
+
+def test_excludes_dates_before_the_configured_range_start(calendar_payload):
+    result = available_dates(calendar_payload, TODAY, start=date(2026, 12, 16))
+    assert result == {"2026-12-16"}

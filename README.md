@@ -83,17 +83,18 @@ NOTIFY_EMAIL_TO=you@example.com someone.else@example.com
 `GMAIL_APP_PASSWORD` must be a Gmail **App Password**, not your regular account
 password — generate one from your Google Account's security settings.
 
-### 4. Configure the Months to Watch
+### 4. Configure the Date Range to Watch
 
-Create (or edit) `state.json` and set `config.target_months` to the months you
-want checked (each as a `"YYYY-MM"` string):
+Create (or edit) `state.json` and set `config.target_range` to the date range
+you want checked (`start_date`/`end_date` as `"YYYY-MM-DD"` strings, inclusive):
 
 ```json
 {
   "config": {
-    "target_months": [
-      "2026-12"
-    ]
+    "target_range": {
+      "start_date": "2026-12-01",
+      "end_date": "2027-01-15"
+    }
   },
   "state": {
     "available": []
@@ -110,8 +111,9 @@ it to detect newly-available dates between runs.
 uv run main.py
 ```
 
-This performs one check against every configured month, emails you about any
-newly-available dates, and updates `state.json`.
+This performs one check against every month spanned by the configured range,
+emails you about any newly-available dates within that range, and updates
+`state.json`.
 
 ## ⚙️ Configuration
 
@@ -130,7 +132,7 @@ or tabs) — any mix of these works.
 
 | Field | Description |
 |-------|-------------|
-| `config.target_months` | List of `"YYYY-MM"` strings to check. A month that has fully elapsed is skipped. |
+| `config.target_range` | `{"start_date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD"}` window to check, inclusive. Skipped entirely once `end_date` is in the past. |
 | `state.available` | Dates currently known to be available. Written by the monitor after each run — don't hand-edit it. |
 
 ### Scheduling
@@ -145,10 +147,10 @@ of high load, scheduled runs routinely fire 10–30 minutes late.
 ```
 nintendo-museum/
 ├── main.py                # Single-shot entry point - start here!
-├── state.json             # Target months + last-known availability
+├── state.json             # Target date range + last-known availability
 ├── src/
 │   ├── monitor.py         # Fetches and classifies calendar availability
-│   ├── months.py          # "YYYY-MM" parsing helpers
+│   ├── date_range.py      # Date range parsing + elapsed/month-span helpers
 │   ├── state.py           # Reads/writes state.json
 │   └── notifier.py        # Gmail SMTP email notifications
 ├── utils/
@@ -226,15 +228,15 @@ Check your `.env` file:
 cat .env
 ```
 
-### "config.target_months must be a non-empty list"
+### "config.target_range must be an object"
 
-`state.json` is missing `config.target_months`, or it isn't a non-empty list.
-Fix the file as shown in [Configure the Months to Watch](#4-configure-the-months-to-watch).
+`state.json` is missing `config.target_range`, or it isn't an object. Fix the
+file as shown in [Configure the Date Range to Watch](#4-configure-the-date-range-to-watch).
 
-### "Every configured target month has fully elapsed"
+### "Configured target range has fully elapsed"
 
-Every month in `config.target_months` is entirely in the past. Update
-`state.json` with a current or future month.
+The configured range's `end_date` is in the past. Update `state.json` with a
+current or future range.
 
 ### "Module not found" errors
 

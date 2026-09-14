@@ -12,7 +12,7 @@ from src.monitor import (
     TransientFetchError,
     available_dates,
 )
-from src.months import is_fully_elapsed, parse_month
+from src.date_range import months_spanned, parse_range
 from src.notifier import send_availability_email
 from src.state import MalformedStateError
 from src.retry import with_retry
@@ -35,29 +35,24 @@ def run(path=None, today: date_type | None = None, monitor=None, sender=None) ->
 
     try:
         document = state_module.load(path)
-        months = state_module.target_months(document)
-        live_months = [m for m in months if not is_fully_elapsed(m, today)]
+        target_range = state_module.target_range(document)
+        start, end = parse_range(target_range)
     except MalformedStateError as exc:
         logger.error("Cannot read %s: %s", path, exc)
         return EXIT_FAILURE
     except (ValueError, TypeError) as exc:
-        logger.error("Invalid entry in config.target_months (%s): %s", path, exc)
+        logger.error("Invalid config.target_range (%s): %s", path, exc)
         return EXIT_FAILURE
 
-    if not live_months:
+    if end < today:
         logger.warning(
-            "Every configured target month has fully elapsed (%s). Nothing to check — "
-            "update config.target_months in %s.", ", ".join(months), path,
+            "Configured target range (%s to %s) has fully elapsed. Nothing to check — "
+            "update config.target_range in %s.", start, end, path,
         )
         return EXIT_OK
 
     current: set[str] = set()
-    for month in live_months:
-        try:
-            year, month_number = parse_month(month)
-        except (ValueError, TypeError) as exc:
-            logger.error("Invalid entry in config.target_months (%s): %s", path, exc)
-            return EXIT_FAILURE
+    for year, month_number in months_spanned(max(start, today), end):
         try:
             payload = with_retry(lambda: monitor.fetch_calendar(year, month_number))
         except TransientFetchError as exc:
@@ -66,13 +61,13 @@ def run(path=None, today: date_type | None = None, monitor=None, sender=None) ->
         except FatalFetchError as exc:
             logger.error("Fatal fetch failure: %s", exc)
             return EXIT_FAILURE
-        current |= available_dates(payload, today)
+        current |= available_dates(payload, today, start=start, end=end)
 
     previous = state_module.available(document)
     newly_available = current - previous
     logger.info(
-        "Checked %s: %d available, %d newly available",
-        ", ".join(live_months), len(current), len(newly_available),
+        "Checked %s to %s: %d available, %d newly available",
+        start, end, len(current), len(newly_available),
     )
 
     if newly_available:

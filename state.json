@@ -1,8 +1,9 @@
 {
   "config": {
-    "target_months": [
-      "2026-11"
-    ]
+    "target_range": {
+      "start_date": "2026-11-11",
+      "end_date": "2026-11-20"
+    }
   },
   "state": {
     "available": []

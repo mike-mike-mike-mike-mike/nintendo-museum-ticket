@@ -13,7 +13,7 @@ TODAY = date(2026, 12, 10)
 def state_file(tmp_path):
     path = tmp_path / "state.json"
     path.write_text(json.dumps({
-        "config": {"target_months": ["2026-12"]},
+        "config": {"target_range": {"start_date": "2026-12-01", "end_date": "2026-12-31"}},
         "state": {"available": []},
     }))
     return path
@@ -158,17 +158,17 @@ def test_email_recovers_after_retry(state_file, calendar_payload):
     assert read_available(state_file) == ["2026-12-15", "2026-12-16"]
 
 
-def test_elapsed_month_exits_zero(tmp_path, calendar_payload):
+def test_elapsed_range_exits_zero(tmp_path, calendar_payload):
     path = tmp_path / "state.json"
     path.write_text(json.dumps({
-        "config": {"target_months": ["2026-11"]},
+        "config": {"target_range": {"start_date": "2026-11-01", "end_date": "2026-11-30"}},
         "state": {"available": []},
     }))
     monitor = FakeMonitor(calendar_payload)
     code = run(path=path, today=date(2027, 1, 5), monitor=monitor, sender=RecordingSender())
 
     assert code == 0
-    assert monitor.calls == [], "an elapsed month must not be fetched"
+    assert monitor.calls == [], "an elapsed range must not be fetched"
 
 
 def test_malformed_state_exits_nonzero(tmp_path, calendar_payload):
@@ -179,10 +179,10 @@ def test_malformed_state_exits_nonzero(tmp_path, calendar_payload):
     assert code == 1
 
 
-def test_malformed_target_month_exits_nonzero_without_raising(tmp_path, calendar_payload):
+def test_malformed_target_range_exits_nonzero_without_raising(tmp_path, calendar_payload):
     path = tmp_path / "state.json"
     path.write_text(json.dumps({
-        "config": {"target_months": ["2026-1"]},
+        "config": {"target_range": {"start_date": "2026-12-01", "end_date": "not-a-date"}},
         "state": {"available": []},
     }))
     code = run(path=path, today=TODAY, monitor=FakeMonitor(calendar_payload),
@@ -190,12 +190,41 @@ def test_malformed_target_month_exits_nonzero_without_raising(tmp_path, calendar
     assert code == 1
 
 
-def test_fetches_every_configured_month(tmp_path, calendar_payload):
+def test_fetches_every_month_spanned_by_the_range(tmp_path, calendar_payload):
     path = tmp_path / "state.json"
     path.write_text(json.dumps({
-        "config": {"target_months": ["2026-12", "2027-01"]},
+        "config": {"target_range": {"start_date": "2026-12-20", "end_date": "2027-01-05"}},
         "state": {"available": []},
     }))
     monitor = FakeMonitor(calendar_payload)
     run(path=path, today=TODAY, monitor=monitor, sender=RecordingSender())
     assert monitor.calls == [(2026, 12), (2027, 1)]
+
+
+def test_skips_months_before_today_within_a_still_live_range(tmp_path, calendar_payload):
+    """A range that starts in the past but ends in the future must not
+    re-fetch its already-elapsed leading months."""
+    path = tmp_path / "state.json"
+    path.write_text(json.dumps({
+        "config": {"target_range": {"start_date": "2026-01-01", "end_date": "2026-12-31"}},
+        "state": {"available": []},
+    }))
+    monitor = FakeMonitor(calendar_payload)
+    run(path=path, today=TODAY, monitor=monitor, sender=RecordingSender())
+    assert monitor.calls == [(2026, 12)], "months before today must not be fetched"
+
+
+def test_dates_before_the_range_start_are_not_reported_available(tmp_path, calendar_payload):
+    """An available date on-sale and in the future can still fall outside the
+    configured window and must be clipped out end-to-end."""
+    path = tmp_path / "state.json"
+    path.write_text(json.dumps({
+        "config": {"target_range": {"start_date": "2026-12-16", "end_date": "2026-12-31"}},
+        "state": {"available": []},
+    }))
+    sender = RecordingSender()
+    code = run(path=path, today=TODAY, monitor=FakeMonitor(calendar_payload), sender=sender)
+
+    assert code == 0
+    assert sender.sent == [{"2026-12-16"}]
+    assert read_available(path) == ["2026-12-16"]

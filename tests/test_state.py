@@ -7,7 +7,7 @@ from src.state import (
     available,
     load,
     save_available,
-    target_months,
+    target_range,
 )
 
 
@@ -19,35 +19,43 @@ def write(tmp_path, document):
 
 def test_reads_config_and_state(tmp_path):
     path = write(tmp_path, {
-        "config": {"target_months": ["2026-12"]},
+        "config": {"target_range": {"start_date": "2026-12-01", "end_date": "2027-01-15"}},
         "state": {"available": ["2026-12-15"]},
     })
     document = load(path)
-    assert target_months(document) == ["2026-12"]
+    assert target_range(document) == {"start_date": "2026-12-01", "end_date": "2027-01-15"}
     assert available(document) == {"2026-12-15"}
 
 
 def test_missing_state_section_reads_as_empty(tmp_path):
-    path = write(tmp_path, {"config": {"target_months": ["2026-12"]}})
+    path = write(tmp_path, {
+        "config": {"target_range": {"start_date": "2026-12-01", "end_date": "2027-01-15"}},
+    })
     assert available(load(path)) == set()
 
 
 def test_save_preserves_unrelated_config_keys(tmp_path):
     path = write(tmp_path, {
-        "config": {"target_months": ["2026-12"], "note": "keep me"},
+        "config": {
+            "target_range": {"start_date": "2026-12-01", "end_date": "2027-01-15"},
+            "note": "keep me",
+        },
         "state": {"available": []},
     })
     document = load(path)
     save_available(document, {"2026-12-16", "2026-12-15"}, path)
 
     written = json.loads(path.read_text())
-    assert written["config"] == {"target_months": ["2026-12"], "note": "keep me"}
+    assert written["config"] == {
+        "target_range": {"start_date": "2026-12-01", "end_date": "2027-01-15"},
+        "note": "keep me",
+    }
     assert written["state"]["available"] == ["2026-12-15", "2026-12-16"]
 
 
 def test_save_never_writes_a_timestamp(tmp_path):
     path = write(tmp_path, {
-        "config": {"target_months": ["2026-12"]},
+        "config": {"target_range": {"start_date": "2026-12-01", "end_date": "2027-01-15"}},
         "state": {"available": []},
     })
     save_available(load(path), set(), path)
@@ -58,7 +66,7 @@ def test_save_never_writes_a_timestamp(tmp_path):
 def test_repeated_save_of_same_set_is_byte_identical(tmp_path):
     """Guards the 'only commit when it really changed' property."""
     path = write(tmp_path, {
-        "config": {"target_months": ["2026-12"]},
+        "config": {"target_range": {"start_date": "2026-12-01", "end_date": "2027-01-15"}},
         "state": {"available": []},
     })
     save_available(load(path), {"2026-12-15"}, path)
@@ -74,10 +82,10 @@ def test_malformed_json_raises(tmp_path):
         load(path)
 
 
-def test_missing_target_months_raises(tmp_path):
+def test_missing_target_range_raises(tmp_path):
     path = write(tmp_path, {"config": {}, "state": {"available": []}})
     with pytest.raises(MalformedStateError):
-        target_months(load(path))
+        target_range(load(path))
 
 
 def test_missing_file_raises(tmp_path):

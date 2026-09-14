@@ -20,11 +20,11 @@ def load(path: Path = DEFAULT_PATH) -> dict:
     return document
 
 
-def target_months(document: dict) -> list[str]:
-    months = document.get("config", {}).get("target_months")
-    if not months or not isinstance(months, list):
-        raise MalformedStateError("config.target_months must be a non-empty list")
-    return months
+def target_range(document: dict) -> dict:
+    range_value = document.get("config", {}).get("target_range")
+    if not range_value or not isinstance(range_value, dict):
+        raise MalformedStateError("config.target_range must be an object")
+    return range_value
 
 
 def available(document: dict) -> set[str]:

@@ -19,8 +19,13 @@ class FatalFetchError(Exception):
     """A problem that will not fix itself. The caller should exit non-zero."""
 
 
-def available_dates(calendar_data: dict | None, today: date) -> set[str]:
-    """Dates that are on sale, open, and strictly in the future."""
+def available_dates(
+    calendar_data: dict | None,
+    today: date,
+    start: date | None = None,
+    end: date | None = None,
+) -> set[str]:
+    """Dates that are on sale, open, strictly in the future, and within [start, end]."""
     if not calendar_data:
         return set()
     calendar = calendar_data.get("data", {}).get("calendar", {})
@@ -28,7 +33,12 @@ def available_dates(calendar_data: dict | None, today: date) -> set[str]:
     for date_str, info in calendar.items():
         if info.get("sale_status") != 1 or info.get("open_status") != 1:
             continue
-        if datetime.strptime(date_str, "%Y-%m-%d").date() <= today:
+        day = datetime.strptime(date_str, "%Y-%m-%d").date()
+        if day <= today:
+            continue
+        if start is not None and day < start:
+            continue
+        if end is not None and day > end:
             continue
         found.add(date_str)
     return found
